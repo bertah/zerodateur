@@ -1,0 +1,156 @@
+﻿import sys
+import json
+import os
+import re
+import logging
+import random
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+from datetime import timedelta
+
+DEBUG = True
+FORCE_CONFIG = False
+
+RANDOM_RANGE_IN_SECONDS = 0
+MIN_LUNCH_BREAK_IN_MINUTES = 30
+
+def CreateConfig():
+    p = re.compile("\d\d:\d\d")
+    p2 = re.compile("\d{4}-\d{2}-\d{2}")
+    heureDebut = ""
+    heureDiner = ""
+    heureRetour = ""
+    heureDepart = ""
+    dateProchainCP = ""
+        
+    while p.match(heureDebut) is None:
+        heureDebut = input("Heure d'arrivée (format HH:mm) : ")
+        
+    while p.match(heureDiner) is None:
+        heureDiner = input("Début de votre dîner (format HH:mm) : ")
+    
+    while p.match(heureRetour) is None:
+        heureRetour = input("Heure de retour de dîner (format HH:mm) : ")
+        
+    while p.match(heureDepart) is None:
+        heureDepart = input("Heure de départ (format HH:mm) : ")
+
+    while p2.match(dateProchainCP) is None:
+        dateProchainCP = input("Date de votre prochain CP (yyyy-mm-dd) : ")
+
+    conf = {'heureDebut': heureDebut,
+            'heureDiner': heureDiner,
+            'heureRetour': heureRetour,
+            'heureDepart': heureDepart,
+            'journeeCP': datetime.strptime(dateProchainCP, "%Y-%m-%d").weekday(),
+            'semaineCP': datetime.strptime(dateProchainCP, "%Y-%m-%d").isocalendar()[1] % 2}
+    
+    with open('config.json', 'w') as f:
+        json.dump(conf, f)
+
+    
+def LoadConfig():
+    if not os.path.isfile('config.json'): return
+    with open('config.json', 'r') as f:
+        config = json.load(f)
+    return config
+
+# Requests
+
+def PunchIn():
+    log.info("Punching in ...")
+
+def PunchOut():
+    log.info("Punching out ...")
+        
+
+# Scheduling
+
+def AddEvent(date, eventType, scheduler):
+    log.info("Creating event " + eventType + " at " + str(date))
+
+    if eventType == "PUNCHIN":
+        j = scheduler.add_job(PunchIn, 'date', run_date=date)
+        return
+
+    if eventType == "PUNCHOUT":
+        j = scheduler.add_job(PunchOut, 'date', run_date=date)
+        return
+
+    log.info(str(j))
+    
+    
+def ComputeDate(date, time, previousEvent = None, minimumDelay = None):
+    computed = date + timedelta(hours=time.hour, minutes=time.minute) + timedelta(seconds=random.randint(-RANDOM_RANGE_IN_SECONDS, RANDOM_RANGE_IN_SECONDS))
+
+    if previousEvent is not None and minimumDelay is not None:
+        while ((computed - previousEvent).total_seconds() < minimumDelay * 60):
+            log.debug("Computed date " + str(computed) + " does not respect minimum delay of " + str(minimumDelay) + " between event " + str(previousEvent) + ". Adding 1 minute...")
+            computed = computed + timedelta(minutes=1)
+            
+    return computed
+                
+def AddEvents(day, scheduler):
+    assert (day.hour == 0)
+    assert (day.minute == 0)
+    assert (day.second == 0)
+    
+    h = datetime.strptime(config["heureDebut"], "%H:%M")
+    date = ComputeDate(day, h)
+
+    AddEvent(date, "PUNCHIN", scheduler)
+
+    h = datetime.strptime(config["heureDiner"], "%H:%M")
+    date = ComputeDate(day, h)
+
+    AddEvent(date, "PUNCHOUT", scheduler)
+
+    h = datetime.strptime(config["heureRetour"], "%H:%M")
+    date = ComputeDate(day, h, date, MIN_LUNCH_BREAK_IN_MINUTES)
+
+    AddEvent(date, "PUNCHIN", scheduler)
+
+    h = datetime.strptime(config["heureDepart"], "%H:%M")
+    date = ComputeDate(day, h)
+
+    AddEvent(date, "PUNCHOUT", scheduler)
+
+def CreateSchedule():
+    now = datetime.now()
+    
+    for i in range(0, 7):
+        date = datetime(now.year, now.month, now.day) + timedelta(days=i)
+        
+        if date.weekday() in [5, 6]:
+            log.info("Skipping " + str(date) + " - Reason: Weekend")
+            continue
+
+        AddEvents(date, scheduler)
+        
+    
+# Main
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+ch = logging.StreamHandler(sys.stdout)
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+log.addHandler(ch)
+
+if not os.path.isfile('config.json') or FORCE_CONFIG:
+    CreateConfig()
+
+config = LoadConfig()
+scheduler = BackgroundScheduler()
+
+CreateSchedule()
+
+
+
+
+
+
+
+
+#dureeDiner = int(input("Durée de votre dîner en minutes : "))
+    #heureRetour = datetime.strptime(heureDiner, "%H:%M") + timedelta(minutes = dureeDiner)
