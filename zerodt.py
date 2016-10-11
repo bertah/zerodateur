@@ -8,20 +8,26 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 from datetime import timedelta
 
-import httplib2
-from apiclient import discovery
-from oauth2client import client
-from oauth2client import tools
-from oauth2client.file import Storage
-from oauth2client.service_account import ServiceAccountCredentials
+from gcal import GoogleCalendarHelper
+
+# pip install apscheduler
+# pip install --upgrade google-api-python-client
+# pip install robobrowser
+
+
+#import httplib2
+#from apiclient import discovery
+#from oauth2client import client
+#from oauth2client import tools
+#from oauth2client.file import Storage
+#from oauth2client.service_account import ServiceAccountCredentials
 
 DEBUG = True
-FORCE_CONFIG = False
+FORCE_CONFIG_OVERWRITE = False
 
 RANDOM_RANGE_IN_SECONDS = 0
-MIN_LUNCH_BREAK_IN_MINUTES = 30
+LUNCH_BREAK_MIN_MAX_IN_MINUTES = [30, 90]
 
-GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 GCAL_SERVICE_ACCOUNT_KEYFILE = 'service_keyfile.json'
 GCAL_APPLICATION_NAME = 'Zerodateur'
 GCAL_CALENDAR_ID = 'v8l496693oe7snhpukk4r210fs@group.calendar.google.com'
@@ -29,6 +35,7 @@ OAUTH_CREDENTIALS_PATH = 'oauth2.json'
 
 log = logging.getLogger()
 scheduler = BackgroundScheduler()
+calendar_helper = ""
 
 def CreateConfig():
     p = re.compile("\d\d:\d\d")
@@ -71,29 +78,7 @@ def LoadConfig():
         config = json.load(f)
     return config
 
-# Google Calendar
 
-def ListEvents(calendarId, credentials):
-    http = credentials.authorize(httplib2.Http())
-    service = discovery.build('calendar', 'v3', http=http)
-
-    now = datetime.utcnow().isoformat() + 'Z' # 'Z' indicates UTC time
-    then = (datetime.utcnow() + timedelta(hours=3)).isoformat() + 'Z' # 'Z' indicates UTC time
-    log.info('Checking for events between now and ' + str(then))
-
-    eventsResult = service.events().list(calendarId=calendarId, timeMin=now, timeMax=then, maxResults=10, singleEvents=True, orderBy='startTime').execute()
-    events = eventsResult.get('items', [])
-    for event in events:
-        start = event['start'].get('dateTime', event['start'].get('date'))
-        log.debug(str(start) + " " + str(event['summary']))  
-
-    return events
-
-def GetCredentials():
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(
-    GCAL_SERVICE_ACCOUNT_KEYFILE, scopes=GCAL_SCOPES)
-    delegated_credentials = credentials.create_delegated('zerodt@ccq2.org')
-    return delegated_credentials
 
 # misc
 def IsConflictingEvent(event, journeeCP, semaineCP):  
@@ -110,7 +95,7 @@ def IsConflictingEvent(event, journeeCP, semaineCP):
 def PunchIn(config):
 
     # Check for active events in GCALs
-    events = ListEvents(GCAL_CALENDAR_ID, GetCredentials())
+    events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
     events = [elem for elem in events if IsConflictingEvent(elem, config['journeeCP'], config['semaineCP'])]
 
     if not events:
@@ -143,13 +128,18 @@ def AddEvent(date, eventType, scheduler, config):
     log.info(str(j))
     
     
-def ComputeDate(date, time, previousEvent = None, minimumDelayBetweenEvents = None):
+def ComputeDate(date, time, previousEvent = None, minMaxDelayBetweenPreviousEvent = None):
     computed = date + timedelta(hours=time.hour, minutes=time.minute) + timedelta(seconds=random.randint(-RANDOM_RANGE_IN_SECONDS, RANDOM_RANGE_IN_SECONDS))
 
+    minDelay = minMaxDelayBetweenPreviousEvent[0]
+    maxDelay = minMaxDelayBetweenPreviousEvent[1]
     if previousEvent is not None and minimumDelayBetweenEvents is not None:
-        while ((computed - previousEvent).total_seconds() < minimumDelayBetweenEvents * 60):
-            log.debug("Computed date " + str(computed) + " does not respect minimum delay of " + str(minimumDelayBetweenEvents) + " between event " + str(previousEvent) + ". Adding 1 minute...")
+        while ((computed - previousEvent).total_seconds() < minDelay * 60):
+            log.debug("Computed date " + str(computed) + " does not respect minimum delay of " + str(minDelay) + " between event " + str(previousEvent) + ". Adding 1 minute...")
             computed = computed + timedelta(minutes=1)
+        while ((computed - previousEvent).total_seconds() > maxDelay * 60):
+            log.debug("Computed date " + str(computed) + " does not respect maximum delay of " + str(maxDelay) + " between event " + str(previousEvent) + ". Substracting 1 minute...")
+            computed = computed + timedelta(minutes=-1)
             
     return computed
                 
@@ -169,7 +159,7 @@ def AddEvents(day, scheduler, config):
     AddEvent(date, "PUNCHOUT", scheduler, config)
 
     h = datetime.strptime(config["heureRetour"], "%H:%M")
-    date = ComputeDate(day, h, date, MIN_LUNCH_BREAK_IN_MINUTES)
+    date = ComputeDate(day, h, date, LUNCH_BREAK_MIN_MAX_IN_MINUTES)
 
     AddEvent(date, "PUNCHIN", scheduler, config)
 
@@ -203,13 +193,20 @@ def main():
     ch.setFormatter(formatter)
     log.addHandler(ch)
     
-    if not os.path.isfile('config.json') or FORCE_CONFIG:
+    if not os.path.isfile('config.json') or FORCE_CONFIG_OVERWRITE:
         CreateConfig()
     
     config = LoadConfig()
+
+    calendar_helper = GoogleCalendarHelper(GCAL_SERVICE_ACCOUNT_KEYFILE)
+    events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
+
+    log.info(events)
+
     
-    CreateSchedule(config)
-    RunSchedule()
+    
+    #CreateSchedule(config)
+    #RunSchedule()
 
 
 if __name__ == '__main__':
