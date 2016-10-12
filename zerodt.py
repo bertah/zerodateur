@@ -12,14 +12,19 @@ from gcal import GoogleCalendarHelper
 from fdtparser import FDTParser
 
 
+# En mode simulation, on interroge FDT mais on n'effectue pas l'action
+SIMULATION = False
+
+# Surtout pour le logging
 DEBUG = True
-SIMULATION = True
 
 # Marge d'erreur aléatoire appliquée sur les événements pour simuler la saisie humaine
 RANDOM_RANGE_IN_SECONDS = 180
 
 # Plage minimum / maximum à respecter pour le diner
 LUNCH_BREAK_MIN_MAX_IN_MINUTES = [30, 90]
+
+
 
 GCAL_SERVICE_ACCOUNT_KEYFILE = 'service_keyfile.json'
 GCAL_APPLICATION_NAME = 'Zerodateur'

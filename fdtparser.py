@@ -3,12 +3,13 @@ import logging
 from robobrowser import RoboBrowser
 
 class FDTParser():
-	
-	# 1   IN	Arrivée
-	# 10  OUT	Arrêt temporaire
-	# 20  OUT	Lunch
-	# 30  IN 	Retour du repas
-	# 60  OUT   Quitter
+	# Event Punch   État
+	# 1   	IN		1	Arrivée
+	# 10  	OUT		10	Arrêt temporaire
+	# 	  	IN			Retour arrêt temporaire
+	# 20  	OUT		20	Lunch
+	# 30  	IN 		1	Retour du repas
+	# 60  	OUT   	60	Quitter
 	
 	def __init__(self, company, username, password, simulation=False):
 		self.company = company
