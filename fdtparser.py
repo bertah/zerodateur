@@ -1,12 +1,22 @@
+import re
+import logging
 from robobrowser import RoboBrowser
 
 class FDTParser():
 	
-	def __init__(self, company, username, password):
+	# 1   IN	Arrivée
+	# 10  OUT	Arrêt temporaire
+	# 20  OUT	Lunch
+	# 30  IN 	Retour du repas
+	# 60  OUT   Quitter
+	
+	def __init__(self, company, username, password, simulation=False):
 		self.company = company
 		self.username = username
 		self.password = password 
 		self.log = logging.getLogger()
+		self.br = ""
+		self.simulation = simulation
 				
 	def login(self):
 		if not self.br :
@@ -22,28 +32,38 @@ class FDTParser():
 		self.br.submit_form(login_form)
 		
 	def getCurrentState(self):
+		# todo detect if already logged in
+		self.login()
+		
 		self.br.open('https://www.fdtpro.com/fdtpro_v5_03_00/main.php')
 		scr = self.br.find('script')
 		p = re.compile(r'var current_state=(?P<state>\d+)')
 		m = p.search(str(scr))
 		state = m.group('state')
+		p = re.compile(r'var repas_was_used=(?P<repas>\d)')
+		m = p.search(str(scr))
+		repas = m.group('repas')
+		
+		if repas == '1' and state == '1':
+			state = '30'
+		
 		return state
 		
 	def punchInDayStart(self):
-		but_id = 'but_1'
+		self.submitEvent('10')
 	
 	def punchOutLunch(self):
-		but_id = 'but_20'
+		self.submitEvent('20')
 	
 	def punchInBackFromLunch(self):
-		but_id = 'but_30'
+		self.submitEvent('30')
 	
 	def punchOutDayEnd(self):
-		but_id = 'but_60'
+		self.submitEvent('60')
 		
-	def submitEvent(but_id);
-		self.br.open('https://www.fdtpro.com/fdtpro_v5_03_00/main.php')
+	def submitEvent(self, state_id):
+		if not self.simulation:
+			state = state_id.replace('but_','')
+			self.br.open(url='https://www.fdtpro.com/fdtpro_v5_03_00/custom_ccq_horo_change_state.php?evtget=' + state, method='post', headers={'Content-type': 'application/x-www-form-urlencoded', 'Origin': 'https://www.fdtpro.com', 'Referer': 'https://www.fdtpro.com/fdtpro_v5_03_00/custom_ccq_horo.php'})
+			self.log.debug(self.br.response)
 		
-		#xmlhttpKeepAlive.open("POST","custom_ccq_horokeepalive.php",true);
-		#xmlhttpKeepAlive.setRequestHeader("Content-type","application/x-www-form-urlencoded");  
-		#xmlhttpKeepAlive.send('currentstate='+current_state);

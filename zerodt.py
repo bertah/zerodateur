@@ -9,23 +9,19 @@ from datetime import datetime
 from datetime import timedelta
 
 from gcal import GoogleCalendarHelper
+from fdtparser import FDTParser
 
 # pip install apscheduler
 # pip install --upgrade google-api-python-client
 # pip install robobrowser
 
-
-#import httplib2
-#from apiclient import discovery
-#from oauth2client import client
-#from oauth2client import tools
-#from oauth2client.file import Storage
-#from oauth2client.service_account import ServiceAccountCredentials
-
 DEBUG = True
-FORCE_CONFIG_OVERWRITE = False
+SIMULATION = True
 
-RANDOM_RANGE_IN_SECONDS = 0
+# Marge d'erreur aléatoire appliquée sur les événements pour simuler la saisie humaine
+RANDOM_RANGE_IN_SECONDS = 180
+
+# Plage minimum / maximum à respecter pour le diner
 LUNCH_BREAK_MIN_MAX_IN_MINUTES = [30, 90]
 
 GCAL_SERVICE_ACCOUNT_KEYFILE = 'service_keyfile.json'
@@ -40,45 +36,52 @@ calendar_helper = ""
 def CreateConfig():
     p = re.compile("\d\d:\d\d")
     p2 = re.compile("\d{4}-\d{2}-\d{2}")
+    p3 = re.compile("p0\d{4}")
+    p4 = re.compile("^.+$")
     heureDebut = ""
     heureDiner = ""
     heureRetour = ""
     heureDepart = ""
     dateProchainCP = ""
+    fdtUsername = ""
+    fdtPassword = ""
+    fdtCompany = ""
         
     while p.match(heureDebut) is None:
         heureDebut = input("Heure d'arrivée (format HH:mm) : ")
-        
     while p.match(heureDiner) is None:
         heureDiner = input("Début de votre dîner (format HH:mm) : ")
-    
     while p.match(heureRetour) is None:
         heureRetour = input("Heure de retour de dîner (format HH:mm) : ")
-        
     while p.match(heureDepart) is None:
         heureDepart = input("Heure de départ (format HH:mm) : ")
-
     while p2.match(dateProchainCP) is None:
         dateProchainCP = input("Date de votre prochain CP (yyyy-mm-dd) : ")
+    while p4.match(fdtCompany) is None:
+        fdtCompany = input("Nom d'entreprise FDT : ")
+    while p3.match(fdtUsername) is None:
+        fdtUsername = input("Nom d'usager FDT (p0XXXX) : ")
+    while p4.match(fdtPassword) is None:
+        fdtPassword = input("Mot de passe : ")
 
     conf = {'heureDebut': heureDebut,
             'heureDiner': heureDiner,
             'heureRetour': heureRetour,
             'heureDepart': heureDepart,
             'journeeCP': datetime.strptime(dateProchainCP, "%Y-%m-%d").weekday(),
-            'semaineCP': datetime.strptime(dateProchainCP, "%Y-%m-%d").isocalendar()[1] % 2}
+            'semaineCP': datetime.strptime(dateProchainCP, "%Y-%m-%d").isocalendar()[1] % 2,
+            'fdtCompany': fdtCompany,
+            'fdtUsername': fdtUsername,
+            'fdtPassword': fdtPassword}
     
     with open('config.json', 'w') as f:
         json.dump(conf, f)
 
-    
 def LoadConfig():
     if not os.path.isfile('config.json'): return
     with open('config.json', 'r') as f:
         config = json.load(f)
     return config
-
-
 
 # misc
 def IsConflictingEvent(event, journeeCP, semaineCP):  
@@ -93,24 +96,34 @@ def IsConflictingEvent(event, journeeCP, semaineCP):
 # Requests
 
 def PunchIn(config):
-
     # Check for active events in GCALs
     events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
     events = [elem for elem in events if IsConflictingEvent(elem, config['journeeCP'], config['semaineCP'])]
 
     if not events:
-        log.info('No conflicting events found.')
-        log.info("Punching in ...")
+        log.info('No conflicting events found. Punching in ...')
+        state = fdt_parser.getCurrentState()
+        if state == '60':
+            fdt_parser.punchInDayStart()
+        elif state == '20':
+            fdt_parser.punchInBackFromLunch()
+        else:
+            log.error('Unrecognized state: ' + state + '. Already punched in?')
     else:
-        log.warn('Found conflicting event(s). Will not punch in.')
-        log.debug(events)
+        log.warn('Found following conflicting event(s). Will not punch in.')
         for event in events:
             start = event['start'].get('dateTime', event['start'].get('date'))
-            log.debug(str(start) + " " + str(event['summary']))                                       
+            log.warn(str(start) + " " + str(event['summary']))
 
 def PunchOut(config):
     log.info("Punching out ...")
-        
+    state = fdt_parser.getCurrentState()
+    if state == '1':
+        fdt_parser.punchOutLunch()
+    elif state == '30':
+        fdt_parser.punchOutDayEnd()
+    else:
+        log.error('Unrecognized state: ' + state + '. Already punched out?')
 
 # Scheduling
 
@@ -130,10 +143,11 @@ def AddEvent(date, eventType, scheduler, config):
     
 def ComputeDate(date, time, previousEvent = None, minMaxDelayBetweenPreviousEvent = None):
     computed = date + timedelta(hours=time.hour, minutes=time.minute) + timedelta(seconds=random.randint(-RANDOM_RANGE_IN_SECONDS, RANDOM_RANGE_IN_SECONDS))
-
-    minDelay = minMaxDelayBetweenPreviousEvent[0]
-    maxDelay = minMaxDelayBetweenPreviousEvent[1]
-    if previousEvent is not None and minimumDelayBetweenEvents is not None:
+    
+    if previousEvent is not None and minMaxDelayBetweenPreviousEvent is not None:
+        minDelay = minMaxDelayBetweenPreviousEvent[0]
+        maxDelay = minMaxDelayBetweenPreviousEvent[1]
+    
         while ((computed - previousEvent).total_seconds() < minDelay * 60):
             log.debug("Computed date " + str(computed) + " does not respect minimum delay of " + str(minDelay) + " between event " + str(previousEvent) + ". Adding 1 minute...")
             computed = computed + timedelta(minutes=1)
@@ -184,8 +198,6 @@ def RunSchedule():
     scheduler.start()
         
 def main():
-    # Main
-    
     log.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(logging.DEBUG)
@@ -193,20 +205,17 @@ def main():
     ch.setFormatter(formatter)
     log.addHandler(ch)
     
-    if not os.path.isfile('config.json') or FORCE_CONFIG_OVERWRITE:
+    if not os.path.isfile('config.json'):
         CreateConfig()
     
     config = LoadConfig()
-
     calendar_helper = GoogleCalendarHelper(GCAL_SERVICE_ACCOUNT_KEYFILE)
-    events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
 
-    log.info(events)
+    fdt_parser = FDTParser(config['fdtCompany'], config['fdtUsername'], config['fdtPassword'], simulation=SIMULATION )
+   
+    CreateSchedule(config)
 
-    
-    
-    #CreateSchedule(config)
-    #RunSchedule()
+    RunSchedule()
 
 
 if __name__ == '__main__':
