@@ -29,6 +29,7 @@ OAUTH_CREDENTIALS_PATH = 'oauth2.json'
 log = logging.getLogger()
 scheduler = BlockingScheduler()
 calendar_helper = ""
+fdt_parser = ""
 
 def CreateConfig():
     p = re.compile("\d\d:\d\d")
