@@ -28,7 +28,6 @@ OAUTH_CREDENTIALS_PATH = 'oauth2.json'
 
 log = logging.getLogger()
 scheduler = BlockingScheduler()
-calendar_helper = ""
 fdt_parser = ""
 
 def CreateConfig():
@@ -93,7 +92,7 @@ def IsConflictingEvent(event, journeeCP, semaineCP):
 
 # Requests
 
-def PunchIn(config):
+def PunchIn(config, fdt_parser, calendar_helper):
     # Check for active events in GCALs
     events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
     events = [elem for elem in events if IsConflictingEvent(elem, config['journeeCP'], config['semaineCP'])]
@@ -113,7 +112,7 @@ def PunchIn(config):
             start = event['start'].get('dateTime', event['start'].get('date'))
             log.warn(str(start) + " " + str(event['summary']))
 
-def PunchOut(config):
+def PunchOut(config, fdt_parser):
     log.info("Punching out ...")
     state = fdt_parser.getCurrentState()
     if state == '1':
@@ -125,15 +124,15 @@ def PunchOut(config):
 
 # Scheduling
 
-def AddEvent(date, eventType, scheduler, config):
+def AddEvent(date, eventType, scheduler, config, calendar_helper, fdt_parser):
     log.info("Creating event " + eventType + " at " + str(date))
 
     if eventType == "PUNCHIN":
-        j = scheduler.add_job(PunchIn, 'date', run_date=date, args=[config])
+        j = scheduler.add_job(PunchIn, 'date', run_date=date, args=[config, fdt_parser, calendar_helper])
         return
 
     if eventType == "PUNCHOUT":
-        j = scheduler.add_job(PunchOut, 'date', run_date=date, args=[config])
+        j = scheduler.add_job(PunchOut, 'date', run_date=date, args=[config, fdt_parser])
         return
 
     log.info(str(j))
@@ -155,7 +154,7 @@ def ComputeDate(date, time, previousEvent = None, minMaxDelayBetweenPreviousEven
             
     return computed
                 
-def AddEvents(day, scheduler, config):
+def AddEvents(day, scheduler, config, calendar_helper, fdt_parser):
     assert (day.hour == 0)
     assert (day.minute == 0)
     assert (day.second == 0)
@@ -163,24 +162,24 @@ def AddEvents(day, scheduler, config):
     h = datetime.strptime(config["heureDebut"], "%H:%M")
     date = ComputeDate(day, h)
 
-    AddEvent(date, "PUNCHIN", scheduler, config)
+    AddEvent(date, "PUNCHIN", scheduler, config, calendar_helper, fdt_parser)
 
     h = datetime.strptime(config["heureDiner"], "%H:%M")
     date = ComputeDate(day, h)
 
-    AddEvent(date, "PUNCHOUT", scheduler, config)
+    AddEvent(date, "PUNCHOUT", scheduler, config, calendar_helper, fdt_parser)
 
     h = datetime.strptime(config["heureRetour"], "%H:%M")
     date = ComputeDate(day, h, date, LUNCH_BREAK_MIN_MAX_IN_MINUTES)
 
-    AddEvent(date, "PUNCHIN", scheduler, config)
+    AddEvent(date, "PUNCHIN", scheduler, config, calendar_helper, fdt_parser)
 
     h = datetime.strptime(config["heureDepart"], "%H:%M")
     date = ComputeDate(day, h)
 
-    AddEvent(date, "PUNCHOUT", scheduler, config)
+    AddEvent(date, "PUNCHOUT", scheduler, config, calendar_helper, fdt_parser)
 
-def CreateSchedule(config):
+def CreateSchedule(config, calendar_helper, fdt_parser):
     now = datetime.now()
     
     for i in range(0, 7):
@@ -190,7 +189,7 @@ def CreateSchedule(config):
             log.info("Skipping " + str(date) + " - Reason: Weekend")
             continue
 
-        AddEvents(date, scheduler, config)
+        AddEvents(date, scheduler, config, calendar_helper, fdt_parser)
 
 def RunSchedule():
     scheduler.start()
@@ -211,7 +210,7 @@ def main():
 
     fdt_parser = FDTParser(config['fdtCompany'], config['fdtUsername'], config['fdtPassword'], simulation=SIMULATION )
    
-    CreateSchedule(config)
+    CreateSchedule(config, calendar_helper, fdt_parser)
 
     RunSchedule()
 
