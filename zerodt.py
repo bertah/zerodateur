@@ -5,15 +5,12 @@ import re
 import logging
 import random
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
 from datetime import timedelta
-
 from gcal import GoogleCalendarHelper
 from fdtparser import FDTParser
 
-# pip install apscheduler
-# pip install --upgrade google-api-python-client
-# pip install robobrowser
 
 DEBUG = True
 SIMULATION = True
@@ -30,7 +27,7 @@ GCAL_CALENDAR_ID = 'v8l496693oe7snhpukk4r210fs@group.calendar.google.com'
 OAUTH_CREDENTIALS_PATH = 'oauth2.json'
 
 log = logging.getLogger()
-scheduler = BackgroundScheduler()
+scheduler = BlockingScheduler()
 calendar_helper = ""
 
 def CreateConfig():
@@ -188,7 +185,7 @@ def CreateSchedule(config):
     for i in range(0, 7):
         date = datetime(now.year, now.month, now.day) + timedelta(days=i)
         
-        if date.weekday() in [5, 6] and not DEBUG:
+        if date.weekday() in [5, 6]:
             log.info("Skipping " + str(date) + " - Reason: Weekend")
             continue
 
