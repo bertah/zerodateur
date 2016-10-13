@@ -105,12 +105,14 @@ def PunchIn(config, fdt_parser, calendar_helper):
     if not events:
         log.info('No conflicting events found. Punching in ...')
         state = fdt_parser.getCurrentState()
+		log.info("Current state: " + state)
         if state == '60':
             fdt_parser.punchInDayStart()
         elif state == '20':
             fdt_parser.punchInBackFromLunch()
         else:
             log.error('Unrecognized state: ' + state + '. Already punched in?')
+		state = fdt_parser.getCurrentState()
     else:
         log.warn('Found following conflicting event(s). Will not punch in.')
         for event in events:
@@ -120,13 +122,14 @@ def PunchIn(config, fdt_parser, calendar_helper):
 def PunchOut(config, fdt_parser):
     log.info("Punching out ...")
     state = fdt_parser.getCurrentState()
+	log.info("Current state: " + state)
     if state == '1':
         fdt_parser.punchOutLunch()
     elif state == '30':
         fdt_parser.punchOutDayEnd()
     else:
         log.error('Unrecognized state: ' + state + '. Already punched out?')
-
+	state = fdt_parser.getCurrentState()
 # Scheduling
 
 def AddEvent(date, eventType, scheduler, config, calendar_helper, fdt_parser):
