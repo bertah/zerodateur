@@ -51,7 +51,7 @@ class FDTParser():
 		return state
 		
 	def punchInDayStart(self):
-		self.submitEvent('10')
+		self.submitEvent('1')
 	
 	def punchOutLunch(self):
 		self.submitEvent('20')
