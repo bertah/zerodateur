@@ -19,12 +19,10 @@ SIMULATION = False
 DEBUG = True
 
 # Marge d'erreur aléatoire appliquée sur les événements pour simuler la saisie humaine
-RANDOM_RANGE_IN_SECONDS = 180
+RANDOM_RANGE_IN_SECONDS = [-180, 180]
 
 # Plage minimum / maximum à respecter pour le diner
 LUNCH_BREAK_MIN_MAX_IN_MINUTES = [30, 90]
-
-
 
 GCAL_SERVICE_ACCOUNT_KEYFILE = 'service_keyfile.json'
 GCAL_APPLICATION_NAME = 'Zerodateur'
@@ -48,6 +46,7 @@ def CreateConfig():
     fdtUsername = ""
     fdtPassword = ""
     fdtCompany = ""
+    additionnalGcalName = ""
         
     while p.match(heureDebut) is None:
         heureDebut = input("Heure d'arrivée (format HH:mm) : ")
@@ -65,6 +64,7 @@ def CreateConfig():
         fdtUsername = input("Nom d'usager FDT (p0XXXX) : ")
     while p4.match(fdtPassword) is None:
         fdtPassword = input("Mot de passe : ")
+    additionnalGcalName = input("Nom du calendrier partagé pour absences (laisser vide si aucun) : ")
 
     conf = {'heureDebut': heureDebut,
             'heureDiner': heureDiner,
@@ -74,7 +74,8 @@ def CreateConfig():
             'semaineCP': datetime.strptime(dateProchainCP, "%Y-%m-%d").isocalendar()[1] % 2,
             'fdtCompany': fdtCompany,
             'fdtUsername': fdtUsername,
-            'fdtPassword': fdtPassword}
+            'fdtPassword': fdtPassword,
+            'additionnalGcalName': additionnalGcalName}
     
     with open('config.json', 'w') as f:
         json.dump(conf, f)
@@ -102,17 +103,21 @@ def PunchIn(config, fdt_parser, calendar_helper):
     events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
     events = [elem for elem in events if IsConflictingEvent(elem, config['journeeCP'], config['semaineCP'])]
 
+    if not events and config["additionnalGcalID"]:
+        log.info("Checking for events in calendar " + config["additionnalGcalName"] + " ...")
+        events = calendar_helper.listEvents(config["additionnalGcalID"])
     if not events:
         log.info('No conflicting events found. Punching in ...')
         state = fdt_parser.getCurrentState()
-		log.info("Current state: " + state)
+        log.info("Current state: " + state)
+        
         if state == '60':
             fdt_parser.punchInDayStart()
         elif state == '20':
             fdt_parser.punchInBackFromLunch()
         else:
             log.error('Unrecognized state: ' + state + '. Already punched in?')
-		state = fdt_parser.getCurrentState()
+        state = fdt_parser.getCurrentState()
     else:
         log.warn('Found following conflicting event(s). Will not punch in.')
         for event in events:
@@ -122,14 +127,14 @@ def PunchIn(config, fdt_parser, calendar_helper):
 def PunchOut(config, fdt_parser):
     log.info("Punching out ...")
     state = fdt_parser.getCurrentState()
-	log.info("Current state: " + state)
+    log.info("Current state: " + state)
     if state == '1':
         fdt_parser.punchOutLunch()
     elif state == '30':
         fdt_parser.punchOutDayEnd()
     else:
         log.error('Unrecognized state: ' + state + '. Already punched out?')
-	state = fdt_parser.getCurrentState()
+    state = fdt_parser.getCurrentState()
 # Scheduling
 
 def AddEvent(date, eventType, scheduler, config, calendar_helper, fdt_parser):
@@ -147,7 +152,7 @@ def AddEvent(date, eventType, scheduler, config, calendar_helper, fdt_parser):
     
     
 def ComputeDate(date, time, previousEvent = None, minMaxDelayBetweenPreviousEvent = None):
-    computed = date + timedelta(hours=time.hour, minutes=time.minute) + timedelta(seconds=random.randint(-RANDOM_RANGE_IN_SECONDS, RANDOM_RANGE_IN_SECONDS))
+    computed = date + timedelta(hours=time.hour, minutes=time.minute) + timedelta(seconds=random.randint(RANDOM_RANGE_IN_SECONDS[0], RANDOM_RANGE_IN_SECONDS[1]))
     
     if previousEvent is not None and minMaxDelayBetweenPreviousEvent is not None:
         minDelay = minMaxDelayBetweenPreviousEvent[0]
@@ -216,6 +221,12 @@ def main():
     config = LoadConfig()
     calendar_helper = GoogleCalendarHelper(GCAL_SERVICE_ACCOUNT_KEYFILE)
 
+    if config["additionnalGcalName"]:
+        try:
+            config["additionnalGcalID"] = calendar_helper.getCalendarIdByName(config["additionnalGcalName"])
+        except NameError:
+            log.error("Impossible de trouver le calendrier " + config["additionnalGcalName"])
+            
     fdt_parser = FDTParser(config['fdtCompany'], config['fdtUsername'], config['fdtPassword'], simulation=SIMULATION )
    
     CreateSchedule(config, calendar_helper, fdt_parser)
