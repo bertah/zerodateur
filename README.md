@@ -9,8 +9,10 @@ Install requirements using pip
 Run the script and leave it running
 > python zerodt.py
 
+Note: Script will run for 7 days only, see todo
+
 <h2>TODO</h2>
 
-- [ ] Take into account the user's number of work hours per day, and adjust final punchout time accordingly
-- [ ] Accept secondary Google Calendar (shared) for personnal events
-- [ ] Create another set of events after schedule is complete (or create longer schedule from start?)
+- [ ] Submit timesheet automatically at beginning of week
+- [x] Accept secondary Google Calendar (shared) for personnal events
+- [ ] Create another set of events after schedule is complete (or create longer schedule from start)
