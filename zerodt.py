@@ -105,10 +105,10 @@ def PunchIn(config, fdt_parser, calendar_helper):
 
     if not events and config["additionnalGcalID"]:
         log.info("Checking for events in calendar " + config["additionnalGcalName"] + " ...")
-		try:
-			events = calendar_helper.listEvents(config["additionnalGcalID"])
-		except:
-			log.warn("Error while checking additionnal Gcal")
+        try:
+            events = calendar_helper.listEvents(config["additionnalGcalID"])
+        except:
+            log.warn("Error while checking additionnal Gcal")
     if not events:
         log.info('No conflicting events found. Punching in ...')
         state = fdt_parser.getCurrentState()
