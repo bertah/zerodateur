@@ -24,7 +24,7 @@ class GoogleCalendarHelper():
         self.credentials = GoogleCalendarHelper.getCredentials(self.keyfile_path, self.scopes)
         
 
-    def listEvents(self, calendarIds, credentials=None):
+    def listEvents(self, calendarId, credentials=None):
                 
         log = self.log
         

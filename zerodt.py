@@ -103,7 +103,7 @@ def PunchIn(config, fdt_parser, calendar_helper):
     events = calendar_helper.listEvents(GCAL_CALENDAR_ID)
     events = [elem for elem in events if IsConflictingEvent(elem, config['journeeCP'], config['semaineCP'])]
 
-    if not events and config["additionnalGcalID"]:
+    if not events and "additionnalGcalID" in config:
         log.info("Checking for events in calendar " + config["additionnalGcalName"] + " ...")
         try:
             events = calendar_helper.listEvents(config["additionnalGcalID"])
@@ -227,6 +227,7 @@ def main():
     if config["additionnalGcalName"]:
         try:
             config["additionnalGcalID"] = calendar_helper.getCalendarIdByName(config["additionnalGcalName"])
+            log.debug("Got additionnal calendar Id =" + config["additionnalGcalID"])
         except NameError:
             log.error("Impossible de trouver le calendrier " + config["additionnalGcalName"])
             
