@@ -9,10 +9,10 @@ Install requirements using pip
 Run the script and leave it running
 > python zerodt.py
 
-Note: Script will run for 7 days only, see todo
+Note: Script will run for 14 days and then stop.
 
 <h2>TODO</h2>
 
 - [ ] Submit timesheet automatically at beginning of week
+- [ ] Create new events automatically after the 14 day period
 - [x] Accept secondary Google Calendar (shared) for personnal events
-- [ ] Create another set of events after schedule is complete (or create longer schedule from start)

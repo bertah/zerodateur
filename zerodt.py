@@ -198,7 +198,7 @@ def AddEvents(day, scheduler, config, calendar_helper, fdt_parser):
 def CreateSchedule(config, calendar_helper, fdt_parser):
     now = datetime.now()
     
-    for i in range(0, 7):
+    for i in range(0, 14):
         date = datetime(now.year, now.month, now.day) + timedelta(days=i)
         
         if date.weekday() in [5, 6]:
