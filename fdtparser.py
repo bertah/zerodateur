@@ -36,7 +36,7 @@ class FDTParser():
 		# todo detect if already logged in
 		self.login()
 		
-		self.br.open('https://www.fdtpro.com/fdtpro_v5_03_00/main.php')
+		self.br.open('https://www.fdtpro.com/fdtpro_v6_00_00/main.php')
 		scr = self.br.find('script')
 		p = re.compile(r'var current_state=(?P<state>\d+)')
 		m = p.search(str(scr))
@@ -65,6 +65,6 @@ class FDTParser():
 	def submitEvent(self, state_id):
 		if not self.simulation:
 			state = state_id.replace('but_','')
-			self.br.open(url='https://www.fdtpro.com/fdtpro_v5_03_00/custom_ccq_horo_change_state.php?evtget=' + state, method='post', headers={'Content-type': 'application/x-www-form-urlencoded', 'Origin': 'https://www.fdtpro.com', 'Referer': 'https://www.fdtpro.com/fdtpro_v5_03_00/custom_ccq_horo.php'})
+			self.br.open(url='https://www.fdtpro.com/fdtpro_v6_00_00/custom_ccq_horo_change_state.php?evtget=' + state, method='post', headers={'Content-type': 'application/x-www-form-urlencoded', 'Origin': 'https://www.fdtpro.com', 'Referer': 'https://www.fdtpro.com/fdtpro_v5_03_00/custom_ccq_horo.php'})
 			self.log.debug(self.br.response)
 		
