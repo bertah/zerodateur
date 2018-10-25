@@ -25,7 +25,9 @@ class FDTParser():
 			self.br = br
 		
 		self.br.open('https://www.fdtpro.com/login.php?lang=fr')
-		login_form = self.br.get_form('login_from')
+
+		login_form = self.br.get_form(method=re.compile(r'POST'))
+
 		login_form['fcompany'].value = self.company
 		login_form['fusername'].value = self.username
 		login_form['fpassword'].value = self.password
