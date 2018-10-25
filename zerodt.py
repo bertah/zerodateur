@@ -5,7 +5,7 @@ import getopt
 from fdtparser import FDTParser
 
 # En mode simulation, on interroge FDT mais on n'effectue pas l'action
-SIMULATION = True
+SIMULATION = False
 
 # Surtout pour le logging
 DEBUG = True
