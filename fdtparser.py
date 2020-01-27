@@ -1,6 +1,7 @@
 import re
 import logging
 from robobrowser import RoboBrowser
+from requests import Session()
 
 class FDTParser():
 	# Event Punch   État
@@ -21,7 +22,9 @@ class FDTParser():
 				
 	def login(self):
 		if not self.br :
-			br = RoboBrowser(user_agent='Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko', parser='html.parser')
+			session = Session()
+			session.verify = False
+			br = RoboBrowser(user_agent='Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko', parser='html.parser', session=session)
 			self.br = br
 		
 		self.br.open('https://www.fdtpro.com/login.php?lang=fr')
