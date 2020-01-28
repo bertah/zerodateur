@@ -1,7 +1,7 @@
 import re
 import logging
 from robobrowser import RoboBrowser
-from requests import Session()
+from requests import Session
 
 class FDTParser():
 	# Event Punch   État
